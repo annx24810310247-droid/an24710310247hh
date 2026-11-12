@@ -926,3 +926,311 @@ namespace WindowsFormsApp1
         }
     }
 }
+bai 4
+NhanVien.cs
+
+using System;
+
+namespace WindowsFormsApp1
+{
+    public class NhanVien
+    {
+        public string MaNV { get; set; }
+        public string HoTen { get; set; }
+        public string ChucVu { get; set; }
+        public DateTime NgayVaoLam { get; set; }
+        public string NodeTag { get; set; } // Dùng để xác định thuộc phòng ban/nhóm nào
+    }
+}
+Form1.Designer.cs
+using System.ComponentModel;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    partial class Form1
+    {
+        private IContainer components = null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+        private void InitializeComponent()
+        {
+            this.components = new Container();
+            this.AutoScaleMode = AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(1000, 650);
+            this.Text = "Trình Quản Lý Tập Tin Dạng Chuyên Nghiệp (TreeView & ListView)";
+        }
+        #endregion
+    }
+}
+Form1.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    public partial class Form1 : Form
+    {
+        private List<NhanVien> danhSachNhanVien = new List<NhanVien>();
+
+        // Controls Giao diện
+        private SplitContainer splitContainer1;
+        private TreeView tvDepartments;
+        private ListView lsvEmployees;
+        private ComboBox cboViewMode;
+
+        // ImageLists biểu tượng
+        private ImageList imgListSmall;
+        private ImageList imgListLarge;
+
+        public Form1()
+        {
+            InitializeComponent();
+            InitImageLists();
+            InitializeComponentsCustom();
+            InitSampleData();
+            BuildTreeView();
+        }
+
+        // --- KHỞI TẠO IMAGELIST BẰNG CODE (Không cần file ảnh ngoài) ---
+        private void InitImageLists()
+        {
+            imgListSmall = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+            imgListLarge = new ImageList { ImageSize = new Size(32, 32), ColorDepth = ColorDepth.Depth32Bit };
+
+            imgListSmall.Images.Add("company", CreateIconBitmap(16, Color.Navy));
+            imgListSmall.Images.Add("dept", CreateIconBitmap(16, Color.DarkGreen));
+            imgListSmall.Images.Add("team", CreateIconBitmap(16, Color.DarkOrange));
+            imgListSmall.Images.Add("user", CreateIconBitmap(16, Color.SteelBlue));
+
+            imgListLarge.Images.Add("user", CreateIconBitmap(32, Color.SteelBlue));
+        }
+
+        private Bitmap CreateIconBitmap(int size, Color color)
+        {
+            Bitmap bmp = new Bitmap(size, size);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(color);
+                using (Pen pen = new Pen(Color.White, 2))
+                {
+                    g.DrawRectangle(pen, 1, 1, size - 3, size - 3);
+                }
+            }
+            return bmp;
+        }
+
+        private void InitializeComponentsCustom()
+        {
+            this.StartPosition = FormStartPosition.CenterScreen;
+
+            TableLayoutPanel mainLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 2,
+                ColumnCount = 1,
+                Padding = new Padding(10)
+            };
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 45F));  // Thanh công cụ chọn chế độ xem
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // SplitContainer
+
+            // --- 1. THANH CÔNG CỤ CHỌN VIEW MODE ---
+            FlowLayoutPanel pnlTop = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+            cboViewMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
+            cboViewMode.Items.AddRange(new object[] { View.Details, View.LargeIcon, View.SmallIcon, View.List, View.Tile });
+            cboViewMode.SelectedItem = View.Details;
+            cboViewMode.SelectedIndexChanged += CboViewMode_SelectedIndexChanged;
+
+            pnlTop.Controls.Add(new Label { Text = "Chế độ xem ListView:", AutoSize = true, Margin = new Padding(0, 5, 10, 0) });
+            pnlTop.Controls.Add(cboViewMode);
+
+            // --- 2. SPLITCONTAINER (TREEVIEW & LISTVIEW) ---
+            splitContainer1 = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 300
+            };
+
+            // TreeView (Bên trái)
+            tvDepartments = new TreeView
+            {
+                Dock = DockStyle.Fill,
+                ImageList = imgListSmall
+            };
+            tvDepartments.AfterSelect += TvDepartments_AfterSelect;
+
+            GroupBox gbTree = new GroupBox { Text = "Cơ cấu tổ chức", Dock = DockStyle.Fill };
+            gbTree.Controls.Add(tvDepartments);
+
+            // ListView (Bên phải)
+            lsvEmployees = new ListView
+            {
+                Dock = DockStyle.Fill,
+                FullRowSelect = true,
+                GridLines = true,
+                View = View.Details,
+                SmallImageList = imgListSmall,
+                LargeImageList = imgListLarge
+            };
+
+            // Tạo các cột cho ListView ở chế độ Details
+            lsvEmployees.Columns.Add("Mã NV", 100);
+            lsvEmployees.Columns.Add("Họ Tên", 180);
+            lsvEmployees.Columns.Add("Chức Vụ", 140);
+            lsvEmployees.Columns.Add("Ngày Vào Làm", 120);
+
+            GroupBox gbList = new GroupBox { Text = "Danh sách nhân viên", Dock = DockStyle.Fill };
+            gbList.Controls.Add(lsvEmployees);
+
+            splitContainer1.Panel1.Controls.Add(gbTree);
+            splitContainer1.Panel2.Controls.Add(gbList);
+
+            mainLayout.Controls.Add(pnlTop, 0, 0);
+            mainLayout.Controls.Add(splitContainer1, 0, 1);
+
+            this.Controls.Add(mainLayout);
+        }
+
+        // --- KHỞI TẠO DỮ LIỆU MẪU ---
+        private void InitSampleData()
+        {
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV01", HoTen = "Nguyễn Văn Hùng", ChucVu = "Trưởng phòng CNTT", NgayVaoLam = new DateTime(2018, 5, 10), NodeTag = "CNTT" });
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV02", HoTen = "Trần Thị Mai", ChucVu = "Lập trình viên Senior", NgayVaoLam = new DateTime(2020, 2, 15), NodeTag = "TEAM_DEV" });
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV03", HoTen = "Lê Hoàng Nam", ChucVu = "Lập trình viên Junior", NgayVaoLam = new DateTime(2022, 8, 1), NodeTag = "TEAM_DEV" });
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV04", HoTen = "Phạm Hoàng Anh", ChucVu = "Tester Lead", NgayVaoLam = new DateTime(2021, 3, 20), NodeTag = "TEAM_QC" });
+
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV05", HoTen = "Vũ Thị Hương", ChucVu = "Trưởng phòng Nhân sự", NgayVaoLam = new DateTime(2019, 11, 1), NodeTag = "HR" });
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV06", HoTen = "Đặng Văn Bằng", ChucVu = "Chuyên viên Tuyển dụng", NgayVaoLam = new DateTime(2023, 1, 15), NodeTag = "TEAM_RECRUIT" });
+
+            danhSachNhanVien.Add(new NhanVien { MaNV = "NV07", HoTen = "Bùi Thị Phương", ChucVu = "Kế toán trưởng", NgayVaoLam = new DateTime(2017, 4, 25), NodeTag = "ACC" });
+        }
+
+        // --- TẠO CẤU TRÚC CÂY DỮ LIỆU TREEVIEW ---
+        private void BuildTreeView()
+        {
+            tvDepartments.Nodes.Clear();
+
+            TreeNode rootNode = new TreeNode("Công ty TNHH Công Nghệ ABC")
+            {
+                Tag = "COMPANY",
+                ImageKey = "company",
+                SelectedImageKey = "company"
+            };
+
+            // Phòng CNTT
+            TreeNode nodeCntt = new TreeNode("Phòng Công Nghệ Thông Tin") { Tag = "CNTT", ImageKey = "dept", SelectedImageKey = "dept" };
+            nodeCntt.Nodes.Add(new TreeNode("Nhóm Lập Trình") { Tag = "TEAM_DEV", ImageKey = "team", SelectedImageKey = "team" });
+            nodeCntt.Nodes.Add(new TreeNode("Nhóm Kiểm Thử (QC)") { Tag = "TEAM_QC", ImageKey = "team", SelectedImageKey = "team" });
+
+            // Phòng Nhân Sự
+            TreeNode nodeHr = new TreeNode("Phòng Nhân Sự") { Tag = "HR", ImageKey = "dept", SelectedImageKey = "dept" };
+            nodeHr.Nodes.Add(new TreeNode("Nhóm Tuyển Dụng") { Tag = "TEAM_RECRUIT", ImageKey = "team", SelectedImageKey = "team" });
+
+            // Phòng Kế Toán
+            TreeNode nodeAcc = new TreeNode("Phòng Kế Toán") { Tag = "ACC", ImageKey = "dept", SelectedImageKey = "dept" };
+
+            rootNode.Nodes.Add(nodeCntt);
+            rootNode.Nodes.Add(nodeHr);
+            rootNode.Nodes.Add(nodeAcc);
+
+            tvDepartments.Nodes.Add(rootNode);
+            tvDepartments.ExpandAll();
+
+            // Chọn mặc định node gốc khi khởi chạy
+            tvDepartments.SelectedNode = rootNode;
+        }
+
+        // --- LỌC NHÂN VIÊN VÀ NẠP LÊN LISTVIEW KHI CLICK NODE TREEVIEW ---
+        private void TvDepartments_AfterSelect(object sender, TreeViewEventArgs e)
+        {
+            if (e.Node == null || e.Node.Tag == null) return;
+
+            string selectedTag = e.Node.Tag.ToString();
+            List<NhanVien> filteredList;
+
+            if (selectedTag == "COMPANY")
+            {
+                // Chọn công ty -> Hiện tất cả nhân viên
+                filteredList = danhSachNhanVien;
+            }
+            else
+            {
+                // Thu thập tất cả các NodeTag của node được chọn và các node con của nó
+                List<string> validTags = GetNodeAndChildTags(e.Node);
+                filteredList = danhSachNhanVien.Where(nv => validTags.Contains(nv.NodeTag)).ToList();
+            }
+
+            LoadListViewData(filteredList);
+        }
+
+        private List<string> GetNodeAndChildTags(TreeNode node)
+        {
+            List<string> tags = new List<string>();
+            if (node.Tag != null) tags.Add(node.Tag.ToString());
+
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                tags.AddRange(GetNodeAndChildTags(childNode));
+            }
+            return tags;
+        }
+
+        private void LoadListViewData(List<NhanVien> list)
+        {
+            lsvEmployees.Items.Clear();
+
+            foreach (var nv in list)
+            {
+                ListViewItem item = new ListViewItem(nv.MaNV)
+                {
+                    ImageKey = "user"
+                };
+
+                item.SubItems.Add(nv.HoTen);
+                item.SubItems.Add(nv.ChucVu);
+                item.SubItems.Add(nv.NgayVaoLam.ToString("dd/MM/yyyy"));
+
+                lsvEmployees.Items.Add(item);
+            }
+        }
+
+        // --- CHUYỂN ĐỔI CHẾ ĐỘ XEM CỦA LISTVIEW ---
+        private void CboViewMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cboViewMode.SelectedItem != null)
+            {
+                lsvEmployees.View = (View)cboViewMode.SelectedItem;
+            }
+        }
+    }
+}
+Program.cs
+using System;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new Form1());
+        }
+    }
+}

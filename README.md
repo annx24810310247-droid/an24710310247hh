@@ -265,3 +265,291 @@ namespace WindowsFormsApp1
         }
     }
 }
+BAI 2:
+DichVu.cs
+namespace WindowsFormsApp1
+{
+    public class DichVu
+    {
+        public string TenDichVu { get; set; }
+        public decimal DonGia { get; set; }
+        public string LoaiDichVu { get; set; }
+
+        public override string ToString()
+        {
+            return $"{TenDichVu} - {DonGia:N0} VNĐ";
+        }
+    }
+}
+Form1.Designer.cs
+using System.ComponentModel;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    partial class Form1
+    {
+        private IContainer components = null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+        private void InitializeComponent()
+        {
+            this.components = new Container();
+            this.AutoScaleMode = AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(820, 530);
+            this.Text = "Bảng Tính Tiền Dịch Vụ Và Chiết Khấu Đơn Hàng";
+        }
+        #endregion
+    }
+}
+Form1.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    public partial class Form1 : Form
+    {
+        private List<DichVu> danhSachDichVuGoc = new List<DichVu>();
+
+        // Controls giao diện
+        private ComboBox cboCategory;
+        private ListBox lstAvailableServices;
+        private ListBox lstSelectedServices;
+        private Button btnSelect, btnRemove, btnClearAll;
+        private NumericUpDown nudChietKhau;
+        private TextBox txtTongTien, txtThanhTien;
+
+        public Form1()
+        {
+            InitializeComponent();
+            InitializeComponentsCustom();
+            InitData();
+        }
+
+        private void InitializeComponentsCustom()
+        {
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
+
+            TableLayoutPanel mainLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                Padding = new Padding(15)
+            };
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 45F));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130F));
+
+            // --- 1. COMBOBOX LOẠI DỊCH VỤ ---
+            TableLayoutPanel topLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
+            topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110F));
+            topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            cboCategory = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboCategory.Items.AddRange(new string[] { "-- Tất cả loại dịch vụ --", "Khám bệnh", "Xét nghiệm", "Chụp X-Quang", "Vắc-xin" });
+            cboCategory.SelectedIndex = 0;
+            cboCategory.SelectedIndexChanged += CboCategory_SelectedIndexChanged;
+
+            topLayout.Controls.Add(new Label { Text = "Loại dịch vụ:", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
+            topLayout.Controls.Add(cboCategory, 1, 0);
+
+            // --- 2. LISTBOX VÀ NÚT CHUYỂN DỊCH VỤ ---
+            TableLayoutPanel listLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            listLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+            listLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10F));
+            listLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+
+            GroupBox gbAvailable = new GroupBox { Text = "Danh sách dịch vụ", Dock = DockStyle.Fill };
+            lstAvailableServices = new ListBox { Dock = DockStyle.Fill, SelectionMode = SelectionMode.One };
+            lstAvailableServices.DoubleClick += (s, e) => BtnSelect_Click(s, e);
+            gbAvailable.Controls.Add(lstAvailableServices);
+
+            GroupBox gbSelected = new GroupBox { Text = "Dịch vụ đã chọn", Dock = DockStyle.Fill };
+            lstSelectedServices = new ListBox { Dock = DockStyle.Fill, SelectionMode = SelectionMode.One };
+            lstSelectedServices.DoubleClick += (s, e) => BtnRemove_Click(s, e);
+            gbSelected.Controls.Add(lstSelectedServices);
+
+            FlowLayoutPanel pnlButtons = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Padding = new Padding(5, 50, 5, 0)
+            };
+
+            btnSelect = new Button { Text = ">", Width = 55, Height = 35 };
+            btnRemove = new Button { Text = "<", Width = 55, Height = 35 };
+            btnClearAll = new Button { Text = "<<", Width = 55, Height = 35 };
+
+            btnSelect.Click += BtnSelect_Click;
+            btnRemove.Click += BtnRemove_Click;
+            btnClearAll.Click += BtnClearAll_Click;
+
+            pnlButtons.Controls.AddRange(new Control[] { btnSelect, btnRemove, btnClearAll });
+
+            listLayout.Controls.Add(gbAvailable, 0, 0);
+            listLayout.Controls.Add(pnlButtons, 1, 0);
+            listLayout.Controls.Add(gbSelected, 2, 0);
+
+            // --- 3. NHÓM TÍNH TIỀN ---
+            GroupBox gbPayment = new GroupBox { Text = "Thông tin thanh toán", Dock = DockStyle.Fill };
+            TableLayoutPanel paymentLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 4,
+                RowCount = 2,
+                Padding = new Padding(10)
+            };
+            paymentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            paymentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
+            paymentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            paymentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
+
+            txtTongTien = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true, Text = "0 VNĐ" };
+            txtThanhTien = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true, Text = "0 VNĐ", Font = new Font(this.Font, FontStyle.Bold) };
+
+            nudChietKhau = new NumericUpDown
+            {
+                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+                Minimum = 0,
+                Maximum = 100,
+                Value = 0,
+                DecimalPlaces = 0
+            };
+            nudChietKhau.ValueChanged += (s, e) => TinhTongTien();
+
+            paymentLayout.Controls.Add(new Label { Text = "Tổng tiền chưa giảm:", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
+            paymentLayout.Controls.Add(txtTongTien, 1, 0);
+            paymentLayout.Controls.Add(new Label { Text = "Tỷ lệ chiết khấu (%):", Anchor = AnchorStyles.Left, AutoSize = true }, 2, 0);
+            paymentLayout.Controls.Add(nudChietKhau, 3, 0);
+
+            paymentLayout.Controls.Add(new Label { Text = "Thành tiền thanh toán:", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 1);
+            paymentLayout.Controls.Add(txtThanhTien, 1, 1);
+
+            gbPayment.Controls.Add(paymentLayout);
+
+            mainLayout.Controls.Add(topLayout, 0, 0);
+            mainLayout.Controls.Add(listLayout, 0, 1);
+            mainLayout.Controls.Add(gbPayment, 0, 2);
+
+            this.Controls.Add(mainLayout);
+        }
+
+        private void InitData()
+        {
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Khám tổng quát", DonGia = 150000, LoaiDichVu = "Khám bệnh" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Khám chuyên khoa", DonGia = 250000, LoaiDichVu = "Khám bệnh" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Xét nghiệm máu tổng phân tích", DonGia = 200000, LoaiDichVu = "Xét nghiệm" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Xét nghiệm đường huyết", DonGia = 100000, LoaiDichVu = "Xét nghiệm" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Chụp X-Quang Phổi", DonGia = 180000, LoaiDichVu = "Chụp X-Quang" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Chụp X-Quang Cột sống", DonGia = 220000, LoaiDichVu = "Chụp X-Quang" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Vắc-xin Cúm mùa", DonGia = 350000, LoaiDichVu = "Vắc-xin" });
+            danhSachDichVuGoc.Add(new DichVu { TenDichVu = "Vắc-xin Viêm gan B", DonGia = 300000, LoaiDichVu = "Vắc-xin" });
+
+            LoadAvailableServices();
+        }
+
+        private void LoadAvailableServices()
+        {
+            lstAvailableServices.Items.Clear();
+            string selectedCategory = cboCategory.SelectedItem?.ToString();
+
+            var filtered = danhSachDichVuGoc.Where(x =>
+                selectedCategory == null ||
+                selectedCategory == "-- Tất cả loại dịch vụ --" ||
+                x.LoaiDichVu == selectedCategory
+            );
+
+            foreach (var item in filtered)
+            {
+                lstAvailableServices.Items.Add(item);
+            }
+        }
+
+        private void CboCategory_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            LoadAvailableServices();
+        }
+
+        private void BtnSelect_Click(object sender, EventArgs e)
+        {
+            if (lstAvailableServices.SelectedItem != null)
+            {
+                DichVu selected = lstAvailableServices.SelectedItem as DichVu;
+                if (selected != null)
+                {
+                    lstSelectedServices.Items.Add(selected);
+                    TinhTongTien();
+                }
+            }
+        }
+
+        private void BtnRemove_Click(object sender, EventArgs e)
+        {
+            if (lstSelectedServices.SelectedItem != null)
+            {
+                lstSelectedServices.Items.Remove(lstSelectedServices.SelectedItem);
+                TinhTongTien();
+            }
+        }
+
+        private void BtnClearAll_Click(object sender, EventArgs e)
+        {
+            if (lstSelectedServices.Items.Count > 0)
+            {
+                lstSelectedServices.Items.Clear();
+                TinhTongTien();
+            }
+        }
+
+        private void TinhTongTien()
+        {
+            decimal tongTien = 0;
+            foreach (DichVu item in lstSelectedServices.Items)
+            {
+                tongTien += item.DonGia;
+            }
+
+            decimal tyLeChietKhau = nudChietKhau.Value;
+            decimal tienChietKhau = tongTien * (tyLeChietKhau / 100m);
+            decimal thanhTien = tongTien - tienChietKhau;
+
+            txtTongTien.Text = $"{tongTien:N0} VNĐ";
+            txtThanhTien.Text = $"{thanhTien:N0} VNĐ";
+        }
+    }
+}
+Program.cs
+using System;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new Form1());
+        }
+    }
+}
+
